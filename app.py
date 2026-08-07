@@ -1,7 +1,6 @@
 import streamlit as st
 import random
 import time
-from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Memory Match", page_icon="🧠")
 st.title("🧠 Memory Card Matching")
@@ -26,15 +25,11 @@ def new_game():
     st.session_state.moves = 0
     st.session_state.wrong_attempts = 0
     st.session_state.win_shown = False
-    st.session_state.mismatch_time = None  # NEW: tracks when a mismatch happened
 
 if "cards" not in st.session_state:
     new_game()
 
 def handle_card_click(i):
-    # NEW: block clicks while a mismatch is being shown (mimics the old "frozen" pause, but responsively)
-    if st.session_state.mismatch_time is not None:
-        return
     if len(st.session_state.flipped) >= 2:
         return
     if i in st.session_state.matched or i in st.session_state.flipped:
@@ -70,17 +65,25 @@ for row in range(4):
             handle_card_click(i)
 
 # Check the 2 flipped cards AFTER drawing the board, so the player sees them first
-if len(st.session_state.flipped) == 2 and st.session_state.mismatch_time is None:
+if len(st.session_state.flipped) == 2:
     a, b = st.session_state.flipped
     if st.session_state.cards[a] == st.session_state.cards[b]:
         st.session_state.matched.add(a)
         st.session_state.matched.add(b)
         st.session_state.flipped = []
     else:
-        st.session_state.mismatch_time = time.time()  # NEW: mark the moment, don't sleep
-
-# NEW: non-blocking check — has 1 second passed since the mismatch?
-if st.session_state.mismatch_time is not None:
-    if time.time() - st.session_state.mismatch_time >= 1:
+        time.sleep(1)  # lets the player see both cards briefly before hiding
         st.session_state.flipped = []
         st.session_state.wrong_attempts += 1
+        if st.session_state.wrong_attempts >= 10:
+            fail_popup()
+        else:
+            st.rerun()
+
+if len(st.session_state.matched) == len(st.session_state.cards) and not st.session_state.win_shown:
+    st.session_state.win_shown = True
+    win_popup()
+
+if st.button("🔄 New Game"):
+    new_game()
+    st.rerun()
